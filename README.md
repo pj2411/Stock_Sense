@@ -1,270 +1,474 @@
-# 📦 StockSense — Enterprise Inventory Management System (IMS)
+# StockSense
 
-> A modern, scalable, real-time modular Inventory Management System designed to digitize inventory tracking, streamline multi-warehouse operations, and replace manual spreadsheets with an automated workflow engine.
+StockSense is a warehouse inventory management system built for the supplied StockSense UI flow. It provides a focused workspace for products, stock balances, warehouse locations, receipts, deliveries, transfers, adjustments, reorder rules, notifications, and audit history.
 
----
+The repository is split into two applications:
 
-## 📑 Table of Contents
+- `stocksense-frontend`: React/Vite user interface
+- `stocksense-backend`: Express/TypeScript API, Prisma data layer, and PostgreSQL schema
 
-- [Overview](#-overview)
-- [Key Features](#-key-features)
-- [Demo Credentials](#-demo-credentials)
-- [System Architecture](#-system-architecture)
-- [Data Models & Schema](#-data-models--schema)
-- [API Endpoints Specification](#-api-endpoints-specification)
-- [Tech Stack](#-tech-stack)
-- [Project Structure](#-project-structure)
-- [Quick Start Guide](#-quick-start-guide)
-- [License](#-license)
+## Features
 
----
+- JWT access and refresh token authentication
+- Argon2 password hashing
+- PostgreSQL with Prisma ORM and UUID primary keys
+- Zod request validation
+- OpenAPI JSON and Swagger UI
+- Dashboard, stock, move history, product, warehouse, location, and supplier screens
+- Receipt, delivery, transfer, and adjustment workflows
+- List and Kanban views for all operational document pages
+- Light and dark theme toggle with local persistence
+- Demo credentials and repeatable demo seed data
+- Append-only stock ledger and audit logs
+- Reorder rules and notifications
+- Transactional stock validation with row locking
 
-## 🎯 Overview
+## Architecture
 
-**StockSense** replaces manual registers and scattered spreadsheets with a centralized, cloud-ready web application. It provides real-time multi-warehouse tracking, location-based stock quants, automated document workflows (`DRAFT` → `WAITING` → `READY` → `DONE`), and an immutable audit trail.
-
-### Target Users & Roles
-- **Admin / Inventory Managers**: Oversee incoming/outgoing stock, manage reordering rules, configure warehouse locations, approve adjustments, and audit ledger logs.
-- **Warehouse Staff**: Process vendor receipts, perform physical stock counts, execute internal stock transfers, pick/pack customer delivery orders.
-
----
-
-## ✨ Key Features
-
-- 📊 **Executive Dashboard**: Live KPIs (Total Catalog SKUs, Total Stock Units, Low Stock Warnings, Pending Receipts/Deliveries) and recent audit stream.
-- 📦 **Product Master Catalog**: Full CRUD for SKUs, categories, units of measure (UOM), reorder levels, and location breakdown.
-- 📍 **Multi-Location Management**: Internal storage racks, Vendor hubs, Customer sites, and Virtual Loss/Gain adjustment zones.
-- 📥 **Stock Receipts (Inbound)**: Receive shipments from suppliers, validate incoming quantities, auto-update stock on hand, and log ledger entries.
-- 📤 **Delivery Orders (Outbound)**: Pick, pack, and ship customer orders with strict inventory availability checks.
-- 🔀 **Internal Transfers**: Rebalance inventory between warehouses/racks with zero overall enterprise stock variance.
-- ⚖️ **Physical Inventory Adjustments**: Reconcile physical inventory counts against system records with variance tracking.
-- 📜 **Immutable Stock Ledger**: Audit trail logging every single quantity change with timestamp, user ID, reference document, and source/destination locations.
-
----
-
-## 🔑 Demo Credentials
-
-Use these credentials to sign in on the login page ([http://localhost:5173/login](http://localhost:5173/login)):
-
-| Role | Name | Email | Password | Access & Responsibilities |
-|---|---|---|---|---|
-| **Admin User** | Priyanshu Raj | `admin@stocksense.io` | `admin123` | Full system access (Warehouses, Categories, Reorder Rules, Audit Logs) |
-| **Inventory Manager** | Himanshu Jha | `manager@stocksense.io` | `manager123` | Operational approvals, document validations & stock reports |
-| **Warehouse Staff** | Aditya Pathak | `staff@stocksense.io` | `staff123` | Daily stock receipts, picks, packs, transfers & physical counts |
-
----
-
-## 🏗️ System Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        CLIENT LAYER                             │
-├─────────────────────────────────────────────────────────────────┤
-│  React 18 SPA (Vite Dev Server: Port 5173)                      │
-│  ├─ Auth Pages (Login with Demo Credentials Card, Signup, OTP)  │
-│  ├─ Dashboard (KPI Cards, Filters, Live Ledger Stream)          │
-│  ├─ Product Master Module (SKUs, Reorder Rules, Categories)     │
-│  ├─ Operations Module (Receipts, Deliveries, Transfers, Adjs)   │
-│  └─ Stock Ledger Viewer & Location Quant Matrix                 │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │ HTTP/REST API Requests
-                                 │ (Vite Proxy → Port 5000)
-┌────────────────────────────────▼────────────────────────────────┐
-│                      API LAYER (Backend)                        │
-├─────────────────────────────────────────────────────────────────┤
-│  Express.js Server (Port 5000)                                  │
-│  ├─ Auth Controller        (/api/auth)                          │
-│  ├─ Product Controller     (/api/products)                      │
-│  ├─ Location Controller    (/api/locations)                     │
-│  ├─ Operation Controller   (/api/operations)                    │
-│  ├─ Receipt Controller     (/api/receipts)                      │
-│  ├─ Delivery Controller    (/api/deliveries)                    │
-│  ├─ Transfer Controller    (/api/transfers)                     │
-│  ├─ Adjustment Controller  (/api/adjustments)                   │
-│  └─ Dashboard Controller   (/api/dashboard)                     │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │ Relational SQL Queries / Store
-┌────────────────────────────────▼────────────────────────────────┐
-│                    DATA LAYER (Database)                        │
-├─────────────────────────────────────────────────────────────────┤
-│  PostgreSQL 12+ Relational Schema / In-Memory Fallback Store    │
-│  ├─ Core Tables (users, warehouses, locations, products)        │
-│  ├─ Quant Table (stock_quants)                                  │
-│  ├─ Workflow Tables (stock_operations, receipts, deliveries)    │
-│  └─ Immutable Audit Log (stock_ledger)                          │
-└─────────────────────────────────────────────────────────────────┘
+```text
+React/Vite frontend :3000
+          |
+          | REST / JSON / JWT
+          v
+Express TypeScript API :4000
+          |
+          | Prisma
+          v
+PostgreSQL :5432
 ```
 
----
+The frontend never connects directly to PostgreSQL. All data access goes through the backend API. Inventory is changed only by validating a receipt, delivery, transfer, or adjustment.
 
-## 📊 Data Models & Schema
+## Repository Layout
+
+The GitHub repository should use a layout similar to this:
+
+```text
+stocksense/
+├── README.md
+├── stocksense-frontend/
+│   ├── src/
+│   ├── .env.example
+│   └── package.json
+└── stocksense-backend/
+    ├── prisma/
+    ├── src/
+    ├── tests/
+    ├── .env.example
+    └── package.json
+```
+
+## Requirements
+
+- Node.js 20 or newer
+- npm
+- PostgreSQL 16 or newer
+- Docker Desktop is optional on macOS; the backend can use Homebrew PostgreSQL when Docker is unavailable
+
+## Local Setup
+
+### 1. Start PostgreSQL and the backend
+
+Open a terminal in the backend directory:
+
+```bash
+cd stocksense-backend
+cp .env.example .env
+npm install
+npm run db:up
+npm run db:deploy
+npm run db:seed
+npm run dev
+```
+
+The API will be available at `http://localhost:4000`.
+
+`npm run db:up` uses Docker when available. On macOS without Docker, install PostgreSQL once and run the same command:
+
+```bash
+brew install postgresql@16
+npm run db:up
+```
+
+Useful database commands:
+
+```bash
+npm run db:status
+npm run db:deploy
+npm run db:seed
+npm run db:studio
+npm run db:down
+```
+
+### 2. Start the frontend
+
+Open a second terminal:
+
+```bash
+cd stocksense-frontend
+cp .env.example .env
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+The frontend uses this API URL by default:
+
+```env
+VITE_API_URL=http://localhost:4000/api/v1
+```
+
+### 3. Demo credentials
+
+The seed creates these accounts. All use the password `ChangeMe123!`.
+
+| Role | Email |
+| --- | --- |
+| Admin | `admin@stocksense.local` |
+| Manager | `manager@stocksense.local` |
+| Operator | `operator@stocksense.local` |
+| Auditor | `auditor@stocksense.local` |
+
+The login page displays these credentials and allows selecting an account directly.
+
+The seed creates 20 products, 20 receipts, 20 deliveries, 20 transfers, 20 adjustments, 20 suppliers, warehouse locations, opening balances, ledger entries, reorder rules, and notification data. The seed uses stable references and is safe to run repeatedly.
+
+## Services and Documentation
+
+| Service | URL |
+| --- | --- |
+| Frontend | `http://localhost:3000` |
+| Backend health | `http://localhost:4000/health` |
+| OpenAPI JSON | `http://localhost:4000/api/v1/openapi.json` |
+| Swagger UI | `http://localhost:4000/api/v1/docs` |
+| PostgreSQL | `localhost:5432` |
+
+## API
+
+Base URL:
+
+```text
+http://localhost:4000/api/v1
+```
+
+Protected requests use:
+
+```http
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+
+Successful responses use this envelope:
 
 ```json
 {
-  "Product": {
-    "id": "String (UUID)",
-    "sku": "String (Unique)",
-    "name": "String",
-    "category_id": "String (FK)",
-    "uom": "String (e.g., kg, units, meters)",
-    "reorder_level": "Integer",
-    "reorder_quantity": "Integer",
-    "created_at": "Timestamp"
-  },
-  "Location": {
-    "id": "String (UUID)",
-    "warehouse_name": "String",
-    "location_name": "String (e.g., Main Store, Production Rack, Rack A)",
-    "type": "Enum [VENDOR, INTERNAL, CUSTOMER, LOSS_ADJUSTMENT]"
-  },
-  "StockQuant": {
-    "id": "String (UUID)",
-    "product_id": "String (FK)",
-    "location_id": "String (FK)",
-    "quantity_on_hand": "Decimal"
-  },
-  "StockOperation": {
-    "id": "String (UUID)",
-    "document_number": "String",
-    "document_type": "Enum [RECEIPT, DELIVERY, INTERNAL_TRANSFER, ADJUSTMENT]",
-    "source_location_id": "String (FK)",
-    "destination_location_id": "String (FK)",
-    "status": "Enum [DRAFT, WAITING, READY, DONE, CANCELED]",
-    "created_by": "String (FK)",
-    "items": [
-      {
-        "product_id": "String (FK)",
-        "demand_qty": "Decimal",
-        "done_qty": "Decimal"
-      }
-    ],
-    "created_at": "Timestamp",
-    "updated_at": "Timestamp"
-  },
-  "StockLedger": {
-    "id": "String (UUID)",
-    "operation_id": "String (FK)",
-    "product_id": "String (FK)",
-    "source_location_id": "String (FK)",
-    "destination_location_id": "String (FK)",
-    "quantity_changed": "Decimal",
-    "timestamp": "Timestamp"
+  "success": true,
+  "data": {}
+}
+```
+
+Errors use this envelope:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INSUFFICIENT_STOCK",
+    "message": "Delivery quantity exceeds free stock",
+    "details": {}
   }
 }
 ```
 
----
-
-## 🔗 API Endpoints Specification
-
 ### Authentication
-- `POST /api/auth/signup` — Create a new user account.
-- `POST /api/auth/login` — Sign in (strictly validates email & password against registered users).
-- `POST /api/auth/request-otp` — Request a password reset OTP code.
-- `POST /api/auth/verify-otp` — Verify OTP code and reset password.
 
-### Master Data & Locations
-- `GET /api/products` — Retrieve master product catalog with stock breakdown.
-- `POST /api/products` — Create a new product SKU.
-- `GET /api/locations` — Get all warehouses and location zones.
-- `GET /api/locations/quants` — Retrieve location-wise stock quants (`StockQuant`).
+| Method | Route | Auth |
+| --- | --- | --- |
+| `POST` | `/auth/register` | Public |
+| `POST` | `/auth/login` | Public |
+| `POST` | `/auth/refresh` | Refresh token |
+| `POST` | `/auth/logout` | Refresh token |
+| `GET` | `/auth/me` | Required |
+| `POST` | `/auth/password/forgot` | Public |
+| `POST` | `/auth/password/verify-otp` | Public |
+| `POST` | `/auth/password/reset` | Reset token |
 
-### Stock Operations Engine
-- `GET /api/operations` — Filter operations by `document_type`, `status`, or `location_id`.
-- `POST /api/operations` — Create a new stock operation ticket.
-- `PATCH /api/operations/:id/status` — Update operation status (`DRAFT` → `WAITING` → `READY` → `DONE`).
-- `POST /api/operations/:id/validate` — Validate operation: debits source location, credits destination location, updates stock quants, and posts to `stock_ledger`.
+Login request:
 
-### Module Direct Endpoints
-- `GET /api/receipts` | `POST /api/receipts` — Inbound vendor receipts.
-- `GET /api/deliveries` | `POST /api/deliveries` — Outbound customer deliveries.
-- `GET /api/transfers` | `POST /api/transfers` — Internal location transfers.
-- `GET /api/adjustments` | `POST /api/adjustments` — Physical count inventory adjustments.
-- `GET /api/ledger` — Fetch immutable stock ledger audit history.
-- `GET /api/dashboard` — Fetch live KPI summary and recent transaction logs.
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology | Description |
-|---|---|---|
-| **Frontend Framework** | React 18 | Modern component architecture SPA |
-| **Build Tool** | Vite | Ultra-fast development server with HMR |
-| **Styling** | Vanilla CSS + Tailwind | Custom Glassmorphism design system & utility classes |
-| **Icons** | Lucide React | Clean, tree-shakeable SVG icons |
-| **Backend Runtime** | Node.js + Express.js | Lightweight REST API server |
-| **Authentication** | JWT + bcryptjs | Stateless token authentication |
-| **Database** | PostgreSQL 12+ | Relational schema (`backend/src/db/schema.sql`) |
-
----
-
-## 📂 Project Structure
-
-```
-Stock_Sense/
-├── backend/
-│   ├── src/
-│   │   ├── config/             # Environment & App Constants
-│   │   ├── controllers/        # Business logic controllers (auth, products, ops...)
-│   │   ├── db/
-│   │   │   ├── schema.sql      # PostgreSQL database schema
-│   │   │   ├── init_schema.sql # Database DDL initialization
-│   │   │   └── store.js        # In-memory data store & stock ledger logger
-│   │   ├── middleware/         # Auth JWT, CORS, Error Handler
-│   │   ├── models/             # Product, Location, StockQuant & StockOperation models
-│   │   ├── routes/             # Express API routers
-│   │   ├── utils/              # Validators, Email service & Logger
-│   │   └── index.js            # Express API server entry point
-│   ├── .env.example
-│   └── package.json
-├── frontend/
-│   ├── src/
-│   │   ├── api/                # API fetch client wrapper
-│   │   ├── components/         # Navigation & Reusable Layout UI
-│   │   ├── context/            # AuthContext state provider
-│   │   ├── pages/              # Module pages (Dashboard, Products, Login...)
-│   │   ├── App.jsx             # React router SPA container
-│   │   ├── index.css           # Glassmorphism design system
-│   │   └── main.jsx            # Entry point
-│   ├── index.html
-│   ├── vite.config.js          # Vite configuration with API proxy to port 5000
-│   └── package.json
-├── docs/
-│   ├── ARCHITECTURE.md         # System architecture & data flow
-│   ├── DATABASE_SCHEMA.md      # Full table definitions & ERD
-│   └── API_DOCUMENTATION.md    # REST API endpoints & payloads
-└── README.md
+```json
+{
+  "email": "admin@stocksense.local",
+  "password": "ChangeMe123!"
+}
 ```
 
----
+Login response data contains `user`, `accessToken`, and `refreshToken`.
 
-## 🚀 Quick Start Guide
+### Catalog and setup
 
-### Prerequisites
-- **Node.js** (v16 or higher)
-- **npm** (v8 or higher)
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/products` | List/search products |
+| `GET` | `/products/:id` | Get one product |
+| `POST` | `/products` | Create product, optionally with opening stock |
+| `PATCH` | `/products/:id` | Update product |
+| `GET` | `/categories` | List categories |
+| `POST` | `/categories` | Create category |
+| `PATCH` | `/categories/:id` | Update category |
+| `GET` | `/uoms` | List units of measure |
+| `POST` | `/uoms` | Create unit of measure |
+| `PATCH` | `/uoms/:id` | Update unit of measure |
+| `GET` | `/warehouses` | List warehouses |
+| `POST` | `/warehouses` | Create warehouse |
+| `PATCH` | `/warehouses/:id` | Update warehouse |
+| `GET` | `/locations` | List warehouse locations |
+| `POST` | `/locations` | Create location |
+| `PATCH` | `/locations/:id` | Update location |
+| `GET` | `/suppliers` | List suppliers |
+| `POST` | `/suppliers` | Create supplier |
+| `PATCH` | `/suppliers/:id` | Update supplier |
+| `POST` | `/inventory/opening` | Create opening stock record and ledger entry |
 
-### 1. Backend Server Setup
+Product creation accepts an optional opening stock object:
+
+```json
+{
+  "sku": "DESK-001",
+  "name": "Desk",
+  "unitCost": 10.99,
+  "categoryId": "<category-uuid>",
+  "uomId": "<uom-uuid>",
+  "openingStock": {
+    "locationId": "<location-uuid>",
+    "quantity": 25
+  }
+}
+```
+
+### Inventory and dashboard
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/inventory` | Current inventory balances |
+| `GET` | `/stock-ledger` | Historical stock movements |
+| `GET` | `/dashboard` | Dashboard totals, document counts, and low stock |
+
+Supported query filters include `productId`, `locationId`, `referenceType`, and `search` where applicable.
+
+Inventory rules:
+
+```text
+free_to_use = on_hand - reserved
+```
+
+`inventory_balances` is current state. `stock_ledger` is append-only history.
+
+### Receipts
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/receipts` | List/search receipts |
+| `GET` | `/receipts/:id` | Get receipt details |
+| `POST` | `/receipts` | Create receipt header |
+| `POST` | `/receipts/:id/items` | Add or update a receipt item |
+| `POST` | `/receipts/:id/ready` | Move Draft to Ready |
+| `POST` | `/receipts/:id/cancel` | Cancel receipt |
+| `POST` | `/receipts/:id/validate` | Receive stock and mark Done |
+
+Workflow:
+
+```text
+Create -> Add items -> Ready -> Validate -> Done
+```
+
+### Deliveries
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/deliveries` | List/search deliveries |
+| `GET` | `/deliveries/:id` | Get delivery details |
+| `POST` | `/deliveries` | Create delivery header |
+| `POST` | `/deliveries/:id/items` | Add or update a delivery item |
+| `POST` | `/deliveries/:id/pick` | Move Draft to Waiting |
+| `POST` | `/deliveries/:id/pack` | Move Waiting to Ready |
+| `POST` | `/deliveries/:id/cancel` | Cancel delivery |
+| `POST` | `/deliveries/:id/validate` | Ship stock and mark Done |
+
+Workflow:
+
+```text
+Create -> Add items -> Pick -> Pack -> Validate -> Done
+```
+
+### Transfers
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/transfers` | List/search transfers |
+| `GET` | `/transfers/:id` | Get transfer details |
+| `POST` | `/transfers` | Create transfer header |
+| `POST` | `/transfers/:id/items` | Add or update a transfer item |
+| `POST` | `/transfers/:id/ready` | Move Draft to Ready |
+| `POST` | `/transfers/:id/validate` | Move stock between locations and mark Done |
+
+Workflow:
+
+```text
+Create -> Add items -> Ready -> Validate -> Done
+```
+
+### Adjustments
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/adjustments` | List/search adjustments |
+| `GET` | `/adjustments/:id` | Get adjustment details |
+| `POST` | `/adjustments` | Create adjustment header |
+| `POST` | `/adjustments/:id/items` | Add counted quantity |
+| `POST` | `/adjustments/:id/ready` | Move Draft to Ready |
+| `POST` | `/adjustments/:id/validate` | Apply count difference and mark Done |
+
+Adjustment calculation:
+
+```text
+difference = counted_quantity - system_quantity
+```
+
+### Planning, notifications, and audit
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/reorder-rules` | List reorder thresholds |
+| `POST` | `/reorder-rules` | Create reorder rule |
+| `PATCH` | `/reorder-rules/:id` | Update reorder rule |
+| `DELETE` | `/reorder-rules/:id` | Delete reorder rule |
+| `GET` | `/notifications` | List notifications |
+| `PATCH` | `/notifications/:id/read` | Mark notification read |
+| `GET` | `/audit-logs` | List audit records |
+
+## Stock Safety Rules
+
+- All primary keys are UUIDs.
+- Product SKU is unique.
+- Product/location inventory balance is unique.
+- A warehouse owns its locations.
+- Products reference a category and unit of measure.
+- Receipts, deliveries, transfers, and adjustments use header/item tables.
+- The stock ledger is append-only.
+- There is no direct arbitrary inventory update endpoint.
+- Stock-changing validations use database transactions.
+- Affected inventory rows are locked before quantity updates.
+- Document states are checked before transitions.
+- Repeated validation of a `DONE` document is idempotent.
+- Every validated stock change writes a ledger entry and audit log.
+- Opening stock creates an opening balance and an `OPENING` ledger entry.
+
+## Frontend Screens
+
+The frontend routes are:
+
+```text
+/login
+/
+/stock
+/move-history
+/receipts
+/deliveries
+/transfers
+/adjustments
+/products
+/warehouses
+/locations
+/suppliers
+/reorder-rules
+/audit-logs
+/settings
+```
+
+The operations pages support both List and Kanban views. Kanban columns are derived from the API document status and display friendly labels such as Pending, Picking, Packed, Shipped, Received, Completed, Validated, and Cancelled.
+
+## Development Commands
+
+### Backend
+
 ```bash
-cd backend
-npm install
-npm start
+npm run dev              # Start API in watch mode
+npm run build            # Compile TypeScript
+npm run typecheck        # TypeScript checks
+npm test                 # Run all tests
+npm run test:unit        # Unit tests
+npm run test:integration # PostgreSQL integration tests
+npm run db:generate      # Generate Prisma client
+npm run db:deploy        # Apply committed migrations
+npm run db:seed          # Seed local demo data
+npm run docs:export      # Export openapi.json
 ```
-> Express API running on `http://localhost:5000`
 
-### 2. Frontend Application Setup
+### Frontend
+
 ```bash
-cd frontend
-npm install
-npm run dev
+npm run dev      # Start Vite development server
+npm run build    # Typecheck and production build
+npm run preview  # Serve the production build locally
 ```
-> React SPA running on `http://localhost:5173`
 
-Open [**http://localhost:5173**](http://localhost:5173) in your browser and log in using any of the [Demo Credentials](#-demo-credentials).
+## Environment Variables
 
----
+Backend `.env`:
 
-## 📄 License
+```env
+NODE_ENV=development
+PORT=4000
+DATABASE_URL=postgresql://stocksense:stocksense@localhost:5432/stocksense?schema=public
+JWT_ACCESS_SECRET=replace-with-a-long-access-secret
+JWT_REFRESH_SECRET=replace-with-a-long-refresh-secret
+JWT_ACCESS_TTL=15m
+JWT_REFRESH_TTL=30d
+OTP_TTL_MINUTES=10
+APP_ORIGIN=http://localhost:3000
+```
 
-This project is licensed under the MIT License.
+Frontend `.env`:
+
+```env
+VITE_API_URL=http://localhost:4000/api/v1
+```
+
+Never commit real `.env` files, JWT secrets, database passwords, or production credentials.
+
+## Troubleshooting
+
+### `docker: command not found`
+
+Docker is optional. Install PostgreSQL with Homebrew and use the backend helper:
+
+```bash
+brew install postgresql@16
+cd stocksense-backend
+npm run db:up
+```
+
+### Prisma `P1001: Can't reach database server`
+
+Check PostgreSQL and the environment file:
+
+```bash
+npm run db:status
+cat .env | grep DATABASE_URL
+npm run db:deploy
+```
+
+### Frontend cannot reach the API
+
+Confirm both servers are running and that `stocksense-frontend/.env` points to:
+
+```env
+VITE_API_URL=http://localhost:4000/api/v1
+```
+
+Then restart Vite after changing environment variables.
+
+## License
+
+This project was created as a hackathon implementation for StockSense.
