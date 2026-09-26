@@ -1,5 +1,7 @@
 # StockSense
 
+![StockSense Dashboard](docs/screenshots/dashboard.png)
+![StockSense Login](docs/screenshots/login.png)
 StockSense is a warehouse inventory management system built for the supplied StockSense UI flow. It provides a focused workspace for products, stock balances, warehouse locations, receipts, deliveries, transfers, adjustments, reorder rules, notifications, and audit history.
 
 The repository is split into two applications:
