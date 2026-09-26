@@ -1,0 +1,16 @@
+import { ArrowUpRight, Check, ChevronDown, CircleAlert, LoaderCircle, Search, SlidersHorizontal } from "lucide-react";
+import type { ReactNode } from "react";
+
+export function Button({ children, variant = "primary", icon, type = "button", onClick, disabled = false }: { children: ReactNode; variant?: "primary" | "quiet" | "outline" | "danger"; icon?: ReactNode; type?: "button" | "submit"; onClick?: () => void; disabled?: boolean }) {
+  return <button type={type} className={`button button-${variant}`} onClick={onClick} disabled={disabled}>{icon}{children}</button>;
+}
+export function IconButton({ label, children, onClick }: { label: string; children: ReactNode; onClick?: () => void }) { return <button className="icon-button" aria-label={label} title={label} onClick={onClick}>{children}</button>; }
+export function SearchBox({ value, onChange, placeholder = "Search records..." }: { value: string; onChange: (value: string) => void; placeholder?: string }) { return <label className="search-box"><Search size={16} /><input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} /></label>; }
+export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) { return <label className="field"><span>{label}</span>{children}{hint && <small>{hint}</small>}</label>; }
+export function Select({ value, onChange, children, placeholder }: { value: string; onChange: (value: string) => void; children: ReactNode; placeholder?: string }) { return <div className="select-wrap"><select value={value} onChange={(event) => onChange(event.target.value)}><option value="">{placeholder || "Select option"}</option>{children}</select><ChevronDown size={15} /></div>; }
+export function StatusPill({ status }: { status: string }) { return <span className={`status status-${status.toLowerCase()}`}><span />{status}</span>; }
+export function EmptyState({ icon, title, description, action }: { icon?: ReactNode; title: string; description: string; action?: ReactNode }) { return <div className="empty-state">{icon || <CircleAlert size={20} />}<strong>{title}</strong><p>{description}</p>{action}</div>; }
+export function LoadingState() { return <div className="loading-state"><LoaderCircle className="spin" size={20} />Loading workspace</div>; }
+export function SectionTitle({ eyebrow, title, description, action }: { eyebrow?: string; title: string; description?: string; action?: ReactNode }) { return <div className="section-title"><div><span className="eyebrow">{eyebrow || "CONTROL CENTER"}</span><h1>{title}</h1>{description && <p>{description}</p>}</div>{action && <div className="section-action">{action}</div>}</div>; }
+export function DataToolbar({ children, right }: { children: ReactNode; right?: ReactNode }) { return <div className="data-toolbar"><div className="toolbar-left">{children}</div><div className="toolbar-right">{right || <><IconButton label="Filter records"><SlidersHorizontal size={16} /></IconButton><IconButton label="Open list view"><ArrowUpRight size={16} /></IconButton></>}</div></div>; }
+export function Notice({ children, tone = "info" }: { children: ReactNode; tone?: "info" | "danger" | "success" }) { return <div className={`notice notice-${tone}`}>{tone === "success" ? <Check size={16} /> : <CircleAlert size={16} />}{children}</div>; }

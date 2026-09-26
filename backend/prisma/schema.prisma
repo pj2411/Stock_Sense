@@ -1,0 +1,425 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  OPERATOR
+  AUDITOR
+}
+
+enum DocumentStatus {
+  DRAFT
+  READY
+  WAITING
+  DONE
+  CANCELLED
+}
+
+enum LedgerType {
+  OPENING
+  RECEIPT
+  DELIVERY
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
+}
+
+enum AdjustmentType {
+  COUNT
+  INCREASE
+  DECREASE
+}
+
+enum NotificationType {
+  LOW_STOCK
+  SYSTEM
+}
+
+enum NotificationSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum OtpPurpose {
+  PASSWORD_RESET
+}
+
+model User {
+  id            String             @id @default(uuid()) @db.Uuid
+  email         String             @unique
+  name          String
+  passwordHash  String             @map("password_hash")
+  role          Role               @default(OPERATOR)
+  isActive      Boolean            @default(true) @map("is_active")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+  refreshTokens RefreshToken[]
+  passwordOtps  PasswordResetOtp[]
+  receipts      Receipt[]          @relation("receipt_responsible")
+  deliveries    Delivery[]         @relation("delivery_responsible")
+  transfers     Transfer[]         @relation("transfer_responsible")
+  adjustments   Adjustment[]       @relation("adjustment_responsible")
+  ledgerEntries StockLedger[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetOtp {
+  id         String     @id @default(uuid()) @db.Uuid
+  userId     String     @map("user_id") @db.Uuid
+  purpose    OtpPurpose @default(PASSWORD_RESET)
+  codeHash   String     @map("code_hash")
+  expiresAt  DateTime   @map("expires_at")
+  consumedAt DateTime?  @map("consumed_at")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose, consumedAt])
+  @@map("password_reset_otps")
+}
+
+model Category {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  products    Product[]
+
+  @@map("categories")
+}
+
+model Uom {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @unique
+  code      String    @unique
+  createdAt DateTime  @default(now()) @map("created_at")
+  products  Product[]
+
+  @@map("uoms")
+}
+
+model Product {
+  id                String             @id @default(uuid()) @db.Uuid
+  sku               String             @unique
+  name              String
+  unitCost          Decimal            @map("unit_cost") @db.Decimal(12, 2)
+  categoryId        String             @map("category_id") @db.Uuid
+  uomId             String             @map("uom_id") @db.Uuid
+  isActive          Boolean            @default(true) @map("is_active")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  category          Category           @relation(fields: [categoryId], references: [id])
+  uom               Uom                @relation(fields: [uomId], references: [id])
+  inventoryBalances InventoryBalance[]
+  receiptItems      ReceiptItem[]
+  deliveryItems     DeliveryItem[]
+  transferItems     TransferItem[]
+  adjustmentItems   AdjustmentItem[]
+  ledgerEntries     StockLedger[]
+  reorderRules      ReorderRule[]
+  notifications     Notification[]
+
+  @@index([categoryId])
+  @@index([uomId])
+  @@index([name])
+  @@map("products")
+}
+
+model Warehouse {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String
+  shortCode String     @unique @map("short_code")
+  address   String?
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  locations Location[]
+
+  @@index([name])
+  @@map("warehouses")
+}
+
+model Location {
+  id                   String             @id @default(uuid()) @db.Uuid
+  warehouseId          String             @map("warehouse_id") @db.Uuid
+  name                 String
+  shortCode            String             @map("short_code")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+  warehouse            Warehouse          @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  inventoryBalances    InventoryBalance[]
+  receiptDestinations  Receipt[]          @relation("receipt_destination")
+  deliverySources      Delivery[]         @relation("delivery_source")
+  transferSources      Transfer[]         @relation("transfer_source")
+  transferDestinations Transfer[]         @relation("transfer_destination")
+  adjustments          Adjustment[]
+  ledgerEntries        StockLedger[]
+  reorderRules         ReorderRule[]
+  notifications        Notification[]
+
+  @@unique([warehouseId, shortCode])
+  @@index([warehouseId])
+  @@map("locations")
+}
+
+model Supplier {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  receipts  Receipt[]
+
+  @@index([name])
+  @@map("suppliers")
+}
+
+model InventoryBalance {
+  id         String   @id @default(uuid()) @db.Uuid
+  productId  String   @map("product_id") @db.Uuid
+  locationId String   @map("location_id") @db.Uuid
+  onHand     Decimal  @default(0) @map("on_hand") @db.Decimal(14, 3)
+  reserved   Decimal  @default(0) @db.Decimal(14, 3)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  product    Product  @relation(fields: [productId], references: [id])
+  location   Location @relation(fields: [locationId], references: [id])
+
+  @@unique([productId, locationId])
+  @@index([locationId])
+  @@map("inventory_balances")
+}
+
+model Receipt {
+  id            String         @id @default(uuid()) @db.Uuid
+  reference     String         @unique
+  supplierId    String?        @map("supplier_id") @db.Uuid
+  destinationId String         @map("destination_id") @db.Uuid
+  responsibleId String?        @map("responsible_id") @db.Uuid
+  scheduledDate DateTime?      @map("scheduled_date")
+  status        DocumentStatus @default(DRAFT)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  supplier      Supplier?      @relation(fields: [supplierId], references: [id])
+  destination   Location       @relation("receipt_destination", fields: [destinationId], references: [id])
+  responsible   User?          @relation("receipt_responsible", fields: [responsibleId], references: [id])
+  items         ReceiptItem[]
+
+  @@index([status])
+  @@index([scheduledDate])
+  @@index([destinationId])
+  @@map("receipts")
+}
+
+model ReceiptItem {
+  id                String  @id @default(uuid()) @db.Uuid
+  receiptId         String  @map("receipt_id") @db.Uuid
+  productId         String  @map("product_id") @db.Uuid
+  quantity          Decimal @db.Decimal(14, 3)
+  processedQuantity Decimal @default(0) @map("processed_quantity") @db.Decimal(14, 3)
+  receipt           Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  product           Product @relation(fields: [productId], references: [id])
+
+  @@unique([receiptId, productId])
+  @@index([productId])
+  @@map("receipt_items")
+}
+
+model Delivery {
+  id              String         @id @default(uuid()) @db.Uuid
+  reference       String         @unique
+  sourceId        String         @map("source_id") @db.Uuid
+  deliveryAddress String?        @map("delivery_address")
+  contact         String?
+  responsibleId   String?        @map("responsible_id") @db.Uuid
+  scheduledDate   DateTime?      @map("scheduled_date")
+  status          DocumentStatus @default(DRAFT)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  source          Location       @relation("delivery_source", fields: [sourceId], references: [id])
+  responsible     User?          @relation("delivery_responsible", fields: [responsibleId], references: [id])
+  items           DeliveryItem[]
+
+  @@index([status])
+  @@index([scheduledDate])
+  @@index([sourceId])
+  @@map("deliveries")
+}
+
+model DeliveryItem {
+  id                String   @id @default(uuid()) @db.Uuid
+  deliveryId        String   @map("delivery_id") @db.Uuid
+  productId         String   @map("product_id") @db.Uuid
+  quantity          Decimal  @db.Decimal(14, 3)
+  processedQuantity Decimal  @default(0) @map("processed_quantity") @db.Decimal(14, 3)
+  delivery          Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  product           Product  @relation(fields: [productId], references: [id])
+
+  @@unique([deliveryId, productId])
+  @@index([productId])
+  @@map("delivery_items")
+}
+
+model Transfer {
+  id            String         @id @default(uuid()) @db.Uuid
+  reference     String         @unique
+  sourceId      String         @map("source_id") @db.Uuid
+  destinationId String         @map("destination_id") @db.Uuid
+  responsibleId String?        @map("responsible_id") @db.Uuid
+  scheduledDate DateTime?      @map("scheduled_date")
+  status        DocumentStatus @default(DRAFT)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  source        Location       @relation("transfer_source", fields: [sourceId], references: [id])
+  destination   Location       @relation("transfer_destination", fields: [destinationId], references: [id])
+  responsible   User?          @relation("transfer_responsible", fields: [responsibleId], references: [id])
+  items         TransferItem[]
+
+  @@index([status])
+  @@map("transfers")
+}
+
+model TransferItem {
+  id         String   @id @default(uuid()) @db.Uuid
+  transferId String   @map("transfer_id") @db.Uuid
+  productId  String   @map("product_id") @db.Uuid
+  quantity   Decimal  @db.Decimal(14, 3)
+  transfer   Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id])
+
+  @@unique([transferId, productId])
+  @@index([productId])
+  @@map("transfer_items")
+}
+
+model Adjustment {
+  id            String           @id @default(uuid()) @db.Uuid
+  reference     String           @unique
+  locationId    String           @map("location_id") @db.Uuid
+  reason        String?
+  type          AdjustmentType   @default(COUNT)
+  status        DocumentStatus   @default(DRAFT)
+  responsibleId String?          @map("responsible_id") @db.Uuid
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+  location      Location         @relation(fields: [locationId], references: [id])
+  responsible   User?            @relation("adjustment_responsible", fields: [responsibleId], references: [id])
+  items         AdjustmentItem[]
+
+  @@index([status])
+  @@index([locationId])
+  @@map("adjustments")
+}
+
+model AdjustmentItem {
+  id              String     @id @default(uuid()) @db.Uuid
+  adjustmentId    String     @map("adjustment_id") @db.Uuid
+  productId       String     @map("product_id") @db.Uuid
+  countedQuantity Decimal    @map("counted_quantity") @db.Decimal(14, 3)
+  systemQuantity  Decimal    @default(0) @map("system_quantity") @db.Decimal(14, 3)
+  difference      Decimal    @default(0) @db.Decimal(14, 3)
+  adjustment      Adjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  product         Product    @relation(fields: [productId], references: [id])
+
+  @@unique([adjustmentId, productId])
+  @@index([productId])
+  @@map("adjustment_items")
+}
+
+model StockLedger {
+  id            String     @id @default(uuid()) @db.Uuid
+  productId     String     @map("product_id") @db.Uuid
+  locationId    String     @map("location_id") @db.Uuid
+  type          LedgerType
+  quantityDelta Decimal    @map("quantity_delta") @db.Decimal(14, 3)
+  balanceAfter  Decimal    @map("balance_after") @db.Decimal(14, 3)
+  referenceType String     @map("reference_type")
+  referenceId   String     @map("reference_id") @db.Uuid
+  actorId       String?    @map("actor_id") @db.Uuid
+  createdAt     DateTime   @default(now()) @map("created_at")
+  product       Product    @relation(fields: [productId], references: [id])
+  location      Location   @relation(fields: [locationId], references: [id])
+  actor         User?      @relation(fields: [actorId], references: [id])
+
+  @@index([productId, locationId, createdAt])
+  @@index([referenceType, referenceId])
+  @@map("stock_ledger")
+}
+
+model ReorderRule {
+  id         String   @id @default(uuid()) @db.Uuid
+  productId  String   @map("product_id") @db.Uuid
+  locationId String   @map("location_id") @db.Uuid
+  minQty     Decimal  @map("min_qty") @db.Decimal(14, 3)
+  maxQty     Decimal? @map("max_qty") @db.Decimal(14, 3)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, locationId])
+  @@map("reorder_rules")
+}
+
+model Notification {
+  id         String               @id @default(uuid()) @db.Uuid
+  userId     String?              @map("user_id") @db.Uuid
+  productId  String?              @map("product_id") @db.Uuid
+  locationId String?              @map("location_id") @db.Uuid
+  type       NotificationType
+  severity   NotificationSeverity @default(INFO)
+  title      String
+  message    String
+  readAt     DateTime?            @map("read_at")
+  createdAt  DateTime             @default(now()) @map("created_at")
+  user       User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product    Product?             @relation(fields: [productId], references: [id])
+  location   Location?            @relation(fields: [locationId], references: [id])
+
+  @@index([userId, readAt, createdAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id") @db.Uuid
+  before     Json?
+  after      Json?
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+  actor      User?    @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
